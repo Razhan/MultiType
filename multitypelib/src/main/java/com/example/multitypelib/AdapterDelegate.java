@@ -9,8 +9,9 @@ import java.util.List;
 
 public abstract class AdapterDelegate<T> {
 
-    protected AbsDelegationAdapter adapter;
-    protected @LayoutRes int layoutId;
+    private AbsDelegationAdapter adapter;
+    @LayoutRes
+    private int layoutId;
 
     public AdapterDelegate(AbsDelegationAdapter adapter, int layoutId) {
         this.adapter = adapter;
@@ -22,7 +23,14 @@ public abstract class AdapterDelegate<T> {
         if (layoutId <= 0) {
             throw new IllegalArgumentException("Can not create ViewHolder without layoutId");
         }
-        return new ViewHolder(LayoutInflater.from(parent.getContext()).inflate(layoutId, parent, false));
+        ViewHolder holder = new ViewHolder(LayoutInflater.from(parent.getContext()).inflate(layoutId, parent, false));
+        setHolderListener(holder);
+
+        return holder;
+    }
+
+    protected void setHolderListener(ViewHolder holder) {
+
     }
 
     protected abstract void onBindViewHolder(@NonNull T items, int position, @NonNull ViewHolder holder, @NonNull List<Object> payloads);
@@ -41,4 +49,7 @@ public abstract class AdapterDelegate<T> {
     protected void onViewDetachedFromWindow(@NonNull ViewHolder holder) {
     }
 
+    public AbsDelegationAdapter getAdapter() {
+        return adapter;
+    }
 }

@@ -13,6 +13,7 @@ import com.example.ran.multitype.adapter.ListAdapter;
 import java.util.ArrayList;
 import java.util.List;
 
+//todo -1默认所有子类型 防止对应多种delegate 支持list
 public class MainActivity extends AppCompatActivity {
 
     private RecyclerView recyclerView;

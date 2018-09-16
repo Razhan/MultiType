@@ -4,6 +4,7 @@ import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 
 import com.example.multitypelib.AbsDelegationAdapter;
+import com.example.multitypelib.listadapter.AbsListDelegate;
 import com.example.multitypelib.listadapter.AbsSubListDelegate;
 import com.example.multitypelib.listadapter.AbsListDelegatesManager;
 import com.example.ran.multitype.AdapterTypeIndex;
@@ -26,8 +27,8 @@ public class AnimalDelegatesManager extends AbsListDelegatesManager<Animal> {
     @Nullable
     @Override
     @SuppressWarnings("unchecked")
-    public AbsSubListDelegate<Animal, Animal> getDelegateForViewType(int viewType) {
-        return (AbsSubListDelegate<Animal, Animal>) AdapterTypeIndex.getInstance().getDelegateByViewType(viewType);
+    public AbsListDelegate<Animal> getDelegateForViewType(int viewType) {
+        return (AbsListDelegate<Animal>) AdapterTypeIndex.getInstance().getDelegateByViewType(viewType);
     }
 
 }

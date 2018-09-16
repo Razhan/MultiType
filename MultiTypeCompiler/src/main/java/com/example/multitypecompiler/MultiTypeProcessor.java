@@ -1,11 +1,13 @@
 package com.example.multitypecompiler;
 
-import com.example.multitypeannotations.AdapterDelegate;
+import com.example.multitypeannotations.Delegate;
 import com.example.multitypeannotations.Keep;
 import com.google.auto.service.AutoService;
 import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.JavaFile;
 import com.squareup.javapoet.MethodSpec;
+import com.squareup.javapoet.ParameterizedTypeName;
+import com.squareup.javapoet.TypeName;
 import com.squareup.javapoet.TypeSpec;
 
 import java.io.IOException;
@@ -66,6 +68,7 @@ public class MultiTypeProcessor extends AbstractProcessor {
         classBuilder.addMethod(generateSetAdapterMethod().build());
         classBuilder.addMethod(generateSingletonMethod().build());
         classBuilder.addMethod(generateGetItemTypeMethod(typeMethods).build());
+        classBuilder.addMethod(generateGetImplicitDelegatesMethod(delegateTypeInfos).build());
         classBuilder.addMethod(generateGetItemTypeFunctionMethod(typeMethods).build());
         classBuilder.addMethod(generateGetTypeMethod(delegateTypeInfos, typeMethods).build());
         classBuilder.addMethod(generateGetDelegateMethod(delegateTypeInfos).build());
@@ -259,6 +262,21 @@ public class MultiTypeProcessor extends AbstractProcessor {
         return getDelegateLayoutMethodBuilder;
     }
 
+    private MethodSpec.Builder generateGetImplicitDelegatesMethod(List<TypeNode> delegateTypeInfos) {
+        String delegateString = "AdapterDelegate";
+
+        ClassName list = ClassName.get("java.util", "List");
+        ClassName delegateClassName = ClassName.get(adapterPackage, delegateString);
+        TypeName listOfDelegates = ParameterizedTypeName.get(list, delegateClassName);
+
+        MethodSpec.Builder getImplicitDelegatesMethodBuilder = MethodSpec
+                .methodBuilder("getImplicitDelegates")
+                .addModifiers(Modifier.PRIVATE)
+                .addParameter(List.class, "delegateClass")
+                .returns(listOfDelegates);
+
+        return getImplicitDelegatesMethodBuilder;
+    }
 
     private boolean createInfoFile(Set<? extends TypeElement> annotations, RoundEnvironment env,
                                    String generatedPackageName, TypeSpec.Builder classBuilder) {
@@ -288,7 +306,7 @@ public class MultiTypeProcessor extends AbstractProcessor {
     @Override
     public Set<String> getSupportedAnnotationTypes() {
         return new TreeSet<>(Collections.singletonList(
-                AdapterDelegate.class.getCanonicalName()));
+                Delegate.class.getCanonicalName()));
     }
 
 }

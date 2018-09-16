@@ -11,7 +11,7 @@ public abstract class AbsListDelegatesManager<T> extends AbsDelegatesManager<Lis
     @Nullable
     @Override
     @SuppressWarnings("unchecked")
-    public AbsSubListDelegate<T, T> getDelegateForViewType(int viewType) {
+    public AbsListDelegate<T> getDelegateForViewType(int viewType) {
         return null;
     }
 

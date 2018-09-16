@@ -26,12 +26,12 @@ public abstract class AbsDelegatesManager<T> {
     public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
         AdapterDelegate<T> delegate = getDelegateForViewType(viewType);
         if (delegate == null) {
-            throw new NullPointerException("No AdapterDelegate added for ViewType " + viewType);
+            throw new NullPointerException("No Delegate added for ViewType " + viewType);
         }
 
         ViewHolder vh = delegate.onCreateViewHolder(parent);
         if (vh == null) {
-            throw new NullPointerException("ViewHolder returned from AdapterDelegate "
+            throw new NullPointerException("ViewHolder returned from Delegate "
                     + delegate
                     + " for ViewType ="
                     + viewType

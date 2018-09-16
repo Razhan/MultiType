@@ -1,10 +1,8 @@
 package com.example.ran.multitype.adapter;
 
 import android.support.annotation.NonNull;
-import android.view.LayoutInflater;
-import android.view.ViewGroup;
 
-import com.example.multitypeannotations.AdapterDelegate;
+import com.example.multitypeannotations.Delegate;
 import com.example.multitypeannotations.DelegateLayout;
 import com.example.multitypeannotations.Type;
 import com.example.multitypelib.AbsDelegationAdapter;
@@ -16,7 +14,7 @@ import com.example.ran.multitype.model.Cat;
 
 import java.util.List;
 
-@AdapterDelegate(DETAIL = @Type(CLASS = Cat.class))
+@Delegate(DETAIL = @Type(CLASS = Cat.class))
 @DelegateLayout(LAYOUT = R.layout.item_cat)
 public class CatDelegate extends AbsSubListDelegate<Cat, Animal> {
 

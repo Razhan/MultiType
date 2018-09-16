@@ -1,6 +1,6 @@
 package com.example.multitypecompiler;
 
-import com.example.multitypeannotations.AdapterDelegate;
+import com.example.multitypeannotations.Delegate;
 import com.example.multitypeannotations.DelegateLayout;
 import com.example.multitypeannotations.TypeMethod;
 
@@ -22,12 +22,12 @@ class DelegateInfoParser {
 
     static List<TypeNode> collectDelegateTypeInfo(RoundEnvironment env) {
         List<TypeNode> typeInfo = new LinkedList<>();
-        for (Element element : env.getElementsAnnotatedWith(AdapterDelegate.class)) {
+        for (Element element : env.getElementsAnnotatedWith(Delegate.class)) {
             if (!(element instanceof TypeElement)) {
-                throw new IllegalArgumentException("Annotation AdapterDelegate.class should target on a Class");
+                throw new IllegalArgumentException("Annotation Delegate.class should target on a Class");
             }
 
-            AdapterDelegate delegateAnnotation = element.getAnnotation(AdapterDelegate.class);
+            Delegate delegateAnnotation = element.getAnnotation(Delegate.class);
             if (delegateAnnotation != null) {
                 int subType = getSubType(delegateAnnotation);
                 String typeClass = getTypeClassString(delegateAnnotation);
@@ -69,11 +69,11 @@ class DelegateInfoParser {
         return layoutInfo;
     }
 
-    private static int getSubType(AdapterDelegate type) {
+    private static int getSubType(Delegate type) {
         return type.DETAIL().SUBTYPE();
     }
 
-    private static String getTypeClassString(AdapterDelegate type) {
+    private static String getTypeClassString(Delegate type) {
         try {
             return type.DETAIL().CLASS().toString();
         } catch(MirroredTypeException ex) {
