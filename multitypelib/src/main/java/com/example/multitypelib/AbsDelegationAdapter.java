@@ -8,15 +8,16 @@ import java.util.List;
 
 public abstract class AbsDelegationAdapter<T> extends RecyclerView.Adapter<ViewHolder> {
 
-    private AbsAdapterDelegatesManager<T> delegatesManager;
+    private AbsDelegatesManager<T> delegatesManager;
     private T items;
 
-    public AbsDelegationAdapter(@NonNull AbsAdapterDelegatesManager<T> delegatesManager) {
+    public AbsDelegationAdapter(@NonNull AbsDelegatesManager<T> delegatesManager) {
         if (delegatesManager == null) {
-            throw new NullPointerException("AbsAdapterDelegatesManager is null");
+            throw new NullPointerException("AbsDelegatesManager is null");
         }
 
         this.delegatesManager = delegatesManager;
+        this.delegatesManager.setAdapter(this);
     }
 
     @NonNull

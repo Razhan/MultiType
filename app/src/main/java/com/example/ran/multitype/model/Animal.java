@@ -1,4 +1,4 @@
-package com.example.ran.multitype;
+package com.example.ran.multitype.model;
 
 public class Animal {
 

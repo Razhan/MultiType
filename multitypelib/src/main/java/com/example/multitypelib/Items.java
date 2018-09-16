@@ -5,7 +5,7 @@ import android.support.annotation.NonNull;
 import java.util.ArrayList;
 import java.util.Collection;
 
-public class Items<T> extends ArrayList<T> {
+public class Items extends ArrayList<Object> {
 
   public Items() {
     super();
@@ -15,7 +15,7 @@ public class Items<T> extends ArrayList<T> {
     super(initialCapacity);
   }
 
-  public Items(@NonNull Collection<T> c) {
+  public Items(@NonNull Collection<?> c) {
     super(c);
   }
 }

@@ -179,7 +179,7 @@ public class MultiTypeProcessor extends AbstractProcessor {
                 .endControlFlow()
                 .endControlFlow()
                 .addCode("\n")
-                .addStatement("$N += String.valueOf($L)", "clazzString", "subType")
+                .addStatement("$N += $S + String.valueOf($L)", "clazzString", "$", "subType")
                 .beginControlFlow("switch ($N)", "clazzString");
 
         for (int i = 0; i < typeInfo.size(); i++) {
@@ -223,7 +223,7 @@ public class MultiTypeProcessor extends AbstractProcessor {
                 .addModifiers(Modifier.PRIVATE)
                 .addParameter(Class.class, "clazz")
                 .returns(String.class)
-                .beginControlFlow("switch ($N.toString())", "clazz");
+                .beginControlFlow("switch ($N.getName())", "clazz");
 
         for (Map.Entry<TypeElement, ExecutableElement> entry : typeMethods.entrySet()) {
             getItemTypeFunctionMethodBuilder.addCode("case $S:\n", entry.getKey().asType().toString())
@@ -244,7 +244,7 @@ public class MultiTypeProcessor extends AbstractProcessor {
                 .addModifiers(Modifier.PRIVATE)
                 .addParameter(Class.class, "delegateClass")
                 .returns(int.class)
-                .beginControlFlow("switch ($N.toString())", "delegateClass");
+                .beginControlFlow("switch ($N.getName())", "delegateClass");
 
         for (Map.Entry<TypeElement, Integer> entry : layouts.entrySet()) {
             getDelegateLayoutMethodBuilder.addCode("case $S:\n", entry.getKey().asType().toString())

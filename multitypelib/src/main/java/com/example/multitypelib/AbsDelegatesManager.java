@@ -2,13 +2,12 @@ package com.example.multitypelib;
 
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
-import android.support.v7.widget.RecyclerView;
 import android.view.ViewGroup;
 
 import java.util.Collections;
 import java.util.List;
 
-public abstract class AbsAdapterDelegatesManager<T> {
+public abstract class AbsDelegatesManager<T> {
 
     protected static final int FALLBACK_DELEGATE_VIEW_TYPE = Integer.MAX_VALUE - 1;
     private static final List<Object> PAYLOADS_EMPTY_LIST = Collections.emptyList();
@@ -108,7 +107,7 @@ public abstract class AbsAdapterDelegatesManager<T> {
         delegate.onViewDetachedFromWindow(holder);
     }
 
-    public AbsAdapterDelegatesManager<T> setFallbackDelegate(@Nullable AdapterDelegate<T> fallbackDelegate) {
+    public AbsDelegatesManager<T> setFallbackDelegate(@Nullable AdapterDelegate<T> fallbackDelegate) {
         this.fallbackDelegate = fallbackDelegate;
         return this;
     }
