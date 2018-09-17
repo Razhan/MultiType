@@ -150,11 +150,14 @@ public class MultiTypeProcessor extends AbstractProcessor {
                 .methodBuilder("getInstance")
                 .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
                 .returns(ClassName.get(packageName, delegateIndexClassName))
-                .addCode("if ($N == null) {\n", "instance")
-                .addCode("$>synchronized ($T.class) {\n", generatedFullName)
-                .addCode("$>if ($N == null) {\n", "instance")
-                .addStatement("$>$N = new $T()", "instance", generatedFullName)
-                .addCode("$<}\n$<}\n$<}\n\n")
+                .beginControlFlow("if ($N == $S)", "instance", null)
+                .beginControlFlow("synchronized ($T.class)", generatedFullName)
+                .beginControlFlow("if ($N == $S)", "instance", null)
+                .addStatement("$N = new $T()", "instance", generatedFullName)
+                .endControlFlow()
+                .endControlFlow()
+                .endControlFlow()
+                .addCode("\n")
                 .addStatement("return $N", "instance");
     }
 
@@ -180,6 +183,7 @@ public class MultiTypeProcessor extends AbstractProcessor {
             }
 
 
+
 //            String methodName = null;
 //            if (methods != null && methods.containsKey(nodes.get(i).element)) {
 //                methodName = methods.get(nodes.get(i).element).asType().toString();
@@ -187,30 +191,44 @@ public class MultiTypeProcessor extends AbstractProcessor {
 //
 //            setDelegateInfoBuilder.beginControlFlow("try {")
 //                    .addStatement("$T $N = $N.getDeclaredMethod($N)", Method.class, "method", "itemClass", "methodName")
-
             if (nodes.get(i).typeString.equals(None.class.getName())) {
-                setDelegateInfoBuilder.beginControlFlow("try")
+                String typeClassName = "typeClass" + String.valueOf(i);
+                setDelegateInfoBuilder.addStatement("$T $N = $S", Class.class, typeClassName, null)
+                        .beginControlFlow("try")
                         .addStatement("$T $N = $T.class.getGenericSuperclass()", Type.class, "superclass", ClassName.get(nodes.get(i).element))
-                        .addStatement("$T $N = ($T) (($T) $N).getActualTypeArguments()[$L]",
-                                Class.class, "typeClass", Class.class, ParameterizedType.class, "superclass", 0)
+                        .addStatement("$N = ($T) (($T) $N).getActualTypeArguments()[$L]", typeClassName, Class.class, ParameterizedType.class, "superclass", 0)
+                        .addCode("\n")
+                        .beginControlFlow("if ($N == $S)", typeClassName, null)
+                        .addStatement("throw new $T($S)", IllegalArgumentException.class, "1111112")
+                        .endControlFlow()
                         .addCode("$<} catch ($T $N) {", Exception.class, "ex")
                         .addCode("\n")
                         .addStatement("$>$N.printStackTrace()", "ex")
                         .addCode("$<}")
-                        .addCode("\n")
                         .addCode("\n");
-            }
 
-            setDelegateInfoBuilder.addStatement("$N.add(new $T($L, $T.class,\n $S, $L, $N, $L))",
-                    "delegateInfoList",
-                    DelegateInfoFullName,
-                    i,
-                    ClassName.get(nodes.get(i).element),
-                    nodes.get(i).typeString,
-                    nodes.get(i).subType,
-                    "null",
-                    resId
-            );
+                setDelegateInfoBuilder.addStatement("$N.add(new $T($L, $T.class, $N.getName(), $L, $S, $L))",
+                        "delegateInfoList",
+                        DelegateInfoFullName,
+                        i,
+                        ClassName.get(nodes.get(i).element),
+                        typeClassName,
+                        nodes.get(i).subType,
+                        null,
+                        resId
+                );
+            } else {
+                setDelegateInfoBuilder.addStatement("$N.add(new $T($L, $T.class, $S, $L, $S, $L))",
+                        "delegateInfoList",
+                        DelegateInfoFullName,
+                        i,
+                        ClassName.get(nodes.get(i).element),
+                        nodes.get(i).typeString,
+                        nodes.get(i).subType,
+                        null,
+                        resId
+                );
+            }
 
             setDelegateInfoBuilder.addCode("\n");
         }
