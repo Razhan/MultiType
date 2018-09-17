@@ -9,7 +9,7 @@ import java.lang.annotation.Target;
 @Target(ElementType.ANNOTATION_TYPE)
 public @interface Type {
 
-    Class CLASS() default Void.class;
+    Class CLASS() default None.class;
 
     int SUBTYPE() default -1;
 

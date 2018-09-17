@@ -14,7 +14,7 @@ import com.example.ran.multitype.model.Cat;
 
 import java.util.List;
 
-@Delegate(DETAIL = @Type(CLASS = Cat.class))
+@Delegate
 @DelegateLayout(LAYOUT = R.layout.item_cat)
 public class CatDelegate extends AbsSubListDelegate<Cat, Animal> {
 
