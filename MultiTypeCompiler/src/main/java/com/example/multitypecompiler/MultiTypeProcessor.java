@@ -55,6 +55,7 @@ public class MultiTypeProcessor extends AbstractProcessor {
 
     private String adapterPackage = "com.example.multitypelib";
     private String adapterString = "AbsDelegationAdapter";
+    private String delegateString = "AdapterDelegate";
 
     @Override
     public synchronized void init(ProcessingEnvironment processingEnv) {
@@ -71,7 +72,7 @@ public class MultiTypeProcessor extends AbstractProcessor {
         Map<TypeElement, Integer> layouts = collectDelegateLayoutInfo(env);
         Map<ClassName, Map<Integer, TypeElement>> typeMap = collectTypeInfo(typeInfo, typeMethods);
 
-        if (typeInfo == null || typeInfo.isEmpty()) {
+        if (typeInfo.isEmpty()) {
             return false;
         }
 
@@ -81,11 +82,11 @@ public class MultiTypeProcessor extends AbstractProcessor {
         classBuilder.addMethod(setAdapterMethod().build());
         classBuilder.addMethod(singletonMethod().build());
         classBuilder.addMethod(setDelegateInfoMethod(typeInfo, layouts).build());
-        classBuilder.addMethod(setDelegateInfoMethod2(typeMap).build());
+        classBuilder.addMethod(setTypeInfoMethod(typeMap).build());
 
         classBuilder.addMethod(setTypeMethodInfoMethod(typeMethods).build());
 
-        classBuilder.addMethod(getTypeMethod(typeInfo).build());
+        classBuilder.addMethod(getTypeMethod().build());
         classBuilder.addMethod(getDelegateMethod().build());
 
         boolean succeeded = createInfoFile(annotations, env, packageName, infoBuilder);
@@ -98,6 +99,7 @@ public class MultiTypeProcessor extends AbstractProcessor {
         ClassName generatedFullName = ClassName.get(packageName, delegateIndexClassName);
         ClassName adapterFullName = ClassName.get(adapterPackage, adapterString);
         ClassName DelegateInfoFullName = ClassName.get(packageName, delegateInfoClassName);
+        ClassName delegateClassName = ClassName.get(adapterPackage, delegateString);
 
         ClassName list = ClassName.get("java.util", "List");
         ClassName map = ClassName.get("java.util", "Map");
@@ -105,7 +107,7 @@ public class MultiTypeProcessor extends AbstractProcessor {
         TypeName delegateInfo = ParameterizedTypeName.get(list, DelegateInfoFullName);
         TypeName typeMethodInfo = ParameterizedTypeName.get(map, ClassName.get(Class.class), ClassName.get(Method.class));
         TypeName typeInfo = ParameterizedTypeName.get(map, ClassName.get(Class.class),
-                ParameterizedTypeName.get(map, ClassName.get(Integer.class), ClassName.get(Class.class)));
+                ParameterizedTypeName.get(map, ClassName.get(Integer.class), delegateClassName));
 
         return TypeSpec.classBuilder(generatedFullName)
                     .addModifiers(Modifier.PUBLIC)
@@ -116,13 +118,13 @@ public class MultiTypeProcessor extends AbstractProcessor {
                     .addField(typeInfo, "typeInfo", Modifier.PRIVATE)
                     .addAnnotation(Keep.class)
                     .addMethod(MethodSpec.constructorBuilder()
-                    .addModifiers(Modifier.PRIVATE)
+                            .addStatement("$N()", "setDelegateInfo")
+                            .addStatement("$N()", "setTypeInfo")
+                            .addModifiers(Modifier.PRIVATE)
                     .build());
     }
 
     private TypeSpec.Builder generateDelegateInfoClass() {
-        String delegateString = "AdapterDelegate";
-
         ClassName generatedFullName = ClassName.get(packageName, delegateInfoClassName);
         ClassName adapterFullName = ClassName.get(adapterPackage, adapterString);
         ClassName delegateClassName = ClassName.get(adapterPackage, delegateString);
@@ -254,10 +256,13 @@ public class MultiTypeProcessor extends AbstractProcessor {
     }
 
 
-    private MethodSpec.Builder setDelegateInfoMethod2(Map<ClassName, Map<Integer, TypeElement>> typeMap) {
+    private MethodSpec.Builder setTypeInfoMethod(Map<ClassName, Map<Integer, TypeElement>> typeMap) {
+        ClassName map = ClassName.get("java.util", "Map");
+        ClassName delegateClassName = ClassName.get(adapterPackage, delegateString);
         ClassName DelegateInfoFullName = ClassName.get(packageName, delegateInfoClassName);
+        TypeName typeInfo = ParameterizedTypeName.get(map, ClassName.get(Integer.class), delegateClassName);
 
-        MethodSpec.Builder setDelegateInfoBuilder = MethodSpec.methodBuilder("setDelegateInfo2")
+        MethodSpec.Builder setDelegateInfoBuilder = MethodSpec.methodBuilder("setTypeInfo")
                 .addModifiers(Modifier.PRIVATE)
                 .returns(void.class);
 
@@ -265,26 +270,30 @@ public class MultiTypeProcessor extends AbstractProcessor {
             return setDelegateInfoBuilder;
         }
 
-        setDelegateInfoBuilder.addStatement("$N = new $T<>()", "typeInfo", HashMap.class)
-                .addCode("\n");
-
-        for (Map.Entry<ClassName, Map<Integer, TypeElement>> entry : typeMap.entrySet()) {
-            if (entry.getValue() == null || entry.getValue().isEmpty()) {
-                continue;
-            }
-
-
-
-            for (Map.Entry<Integer, TypeElement> subEntry : entry.getValue().entrySet()) {
-
-            }
-        }
+        setDelegateInfoBuilder.beginControlFlow("if ($N == null || $N.isEmpty())", "delegateInfoList", "delegateInfoList")
+                .addStatement("return")
+                .endControlFlow()
+                .addCode("\n")
+                .addStatement("$N = new $T<>()", "typeInfo", HashMap.class)
+                .addCode("\n")
+                .beginControlFlow("for ($T $N : $N)", DelegateInfoFullName, "delegateInfo", "delegateInfoList")
+                .addStatement("$T $N", typeInfo, "info")
+                .addCode("\n")
+                .beginControlFlow("if ($N.get($N.$N) == $S)", "typeInfo", "delegateInfo", "typeClass", null)
+                .addStatement("$N = new $T<>()", "info", HashMap.class)
+                .addCode("$<} else {")
+                .addCode("\n")
+                .addStatement("$>$N = $N.get($N.$N)", "info", "typeInfo", "delegateInfo", "typeClass")
+                .endControlFlow()
+                .addCode("\n")
+                .addStatement("$N.put($N.$N, $N.$N)", "info", "delegateInfo", "subtype", "delegateInfo", "delegate")
+                .addStatement("$N.put($N.$N, $N)", "typeInfo", "delegateInfo", "typeClass", "info")
+                .endControlFlow();
 
         return setDelegateInfoBuilder;
     }
 
     private MethodSpec.Builder getDelegateMethod() {
-        String delegateString = "AdapterDelegate";
         ClassName delegateClassName = ClassName.get(adapterPackage, delegateString);
         ClassName DelegateInfoFullName = ClassName.get(packageName, delegateInfoClassName);
 
@@ -346,15 +355,34 @@ public class MultiTypeProcessor extends AbstractProcessor {
         return setTypeMethodInfoBuilder;
     }
 
-    private MethodSpec.Builder getTypeMethod(List<TypeNode> typeInfo) {
+    private MethodSpec.Builder getTypeMethod() {
+        ClassName map = ClassName.get("java.util", "Map");
+        ClassName delegateClassName = ClassName.get(adapterPackage, delegateString);
+        TypeName typeInfo = ParameterizedTypeName.get(map, ClassName.get(Integer.class), delegateClassName);
+
         MethodSpec.Builder getTypeMethodBuilder = MethodSpec
                 .methodBuilder("getItemViewType")
                 .addModifiers(Modifier.PUBLIC)
                 .addParameter(Object.class, "item")
-                .returns(void.class)
-//                .addStatement("$T itemClass = $N.getClass().getName()", String.class, "item")
-//                .addStatement("$T $N = $N($N)", Class.class, "itemClass", "getMultiTypeClass", "item")
-                .addCode("\n");
+                .returns(int.class)
+                .beginControlFlow("if ($N == null || $N.isEmpty())", "typeInfo", "typeInfo")
+                .addStatement("return $L", -1)
+                .endControlFlow()
+                .addCode("\n")
+                .addStatement("$T itemClass = $N.getClass()", Class.class, "item")
+                .addCode("\n")
+                .addStatement("$T $N = $N.get($N)", typeInfo, "delegateList", "typeInfo", "itemClass")
+                .addCode("\n")
+                .beginControlFlow("if ($N.get($N) == null || $N.get($N).isEmpty())", "typeInfo", "itemClass", "typeInfo", "itemClass")
+                .addStatement("return $L", -1)
+                .endControlFlow()
+                .addCode("\n")
+                .beginControlFlow("if ($N.size() == $L && $N.get($L) != $S)", "delegateList", 1, "delegateList", -1, null)
+                .addStatement("return $L", -1)
+                .endControlFlow();
+
+
+
 
         return getTypeMethodBuilder;
     }
