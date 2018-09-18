@@ -11,10 +11,12 @@ import com.example.multitypelib.listadapter.AbsSubListDelegate;
 import com.example.ran.multitype.R;
 import com.example.ran.multitype.model.Animal;
 import com.example.ran.multitype.model.Dog;
+import com.example.ran.multitype.model.Husky;
 
 import java.util.List;
 
-@Delegate(DETAIL = @Type(CLASS = Dog.class, SUBTYPE = 0))
+@Delegate(DETAIL = {@Type(CLASS = Dog.class, SUBTYPE = 0),
+                    @Type(CLASS = Husky.class)})
 @DelegateLayout(LAYOUT = R.layout.item_dog)
 public class DogDelegate extends AbsSubListDelegate<Dog, Animal> {
 
