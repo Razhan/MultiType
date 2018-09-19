@@ -107,19 +107,19 @@ public class MultiTypeProcessor extends AbstractProcessor {
                 ParameterizedTypeName.get(map, ClassName.get(Integer.class), ClassName.get(Integer.class)));
 
         return TypeSpec.classBuilder(generatedFullName)
-                    .addModifiers(Modifier.PUBLIC)
-                    .addField(adapterFullName, "adapter", Modifier.PRIVATE)
-                    .addField(generatedFullName, "instance", Modifier.PRIVATE, Modifier.STATIC, Modifier.VOLATILE)
-                    .addField(delegateInfo, "delegateInfoList", Modifier.PRIVATE)
-                    .addField(typeMethodInfo, "typeMethodInfo", Modifier.PRIVATE)
-                    .addField(typeInfo, "typeInfo", Modifier.PRIVATE)
-                    .addAnnotation(Keep.class)
-                    .addMethod(MethodSpec.constructorBuilder()
-                            .addStatement("$N()", "setDelegateInfo")
-                            .addStatement("$N()", "setTypeMethodInfo")
-                            .addStatement("$N()", "setTypeInfo")
-                            .addModifiers(Modifier.PRIVATE)
-                    .build());
+                .addModifiers(Modifier.PUBLIC)
+                .addField(adapterFullName, "adapter", Modifier.PRIVATE)
+                .addField(generatedFullName, "instance", Modifier.PRIVATE, Modifier.STATIC, Modifier.VOLATILE)
+                .addField(delegateInfo, "delegateInfoList", Modifier.PRIVATE)
+                .addField(typeMethodInfo, "typeMethodInfo", Modifier.PRIVATE)
+                .addField(typeInfo, "typeInfo", Modifier.PRIVATE)
+                .addAnnotation(Keep.class)
+                .addMethod(MethodSpec.constructorBuilder()
+                        .addStatement("$N()", "setDelegateInfo")
+                        .addStatement("$N()", "setTypeMethodInfo")
+                        .addStatement("$N()", "setTypeInfo")
+                        .addModifiers(Modifier.PRIVATE)
+                        .build());
     }
 
     private TypeSpec.Builder generateDelegateInfoClass() {
@@ -318,11 +318,11 @@ public class MultiTypeProcessor extends AbstractProcessor {
         }
 
         setTypeMethodInfoBuilder.addCode("\n")
-            .beginControlFlow("try");
+                .beginControlFlow("try");
 
         int i = 0;
         for (Map.Entry<TypeElement, ExecutableElement> entry : typeMethods.entrySet()) {
-            String methodName = entry .getValue().getSimpleName().toString();
+            String methodName = entry.getValue().getSimpleName().toString();
             String methodVariable = "method" + String.valueOf(i);
 
             if (!entry.getValue().getReturnType().toString().equals(int.class.getName())) {
@@ -385,29 +385,29 @@ public class MultiTypeProcessor extends AbstractProcessor {
     }
 
     private boolean createInfoFile(Set<? extends TypeElement> annotations, RoundEnvironment env,
-                           String generatedPackageName, TypeSpec.Builder classBuilder) {
-if (env.processingOver()) {
-    if (!annotations.isEmpty()) {
-        messager.printMessage(Diagnostic.Kind.ERROR,
-                "Unexpected processing state: annotations still available after processing over");
-        return true;
+                                   String generatedPackageName, TypeSpec.Builder classBuilder) {
+        if (env.processingOver()) {
+            if (!annotations.isEmpty()) {
+                messager.printMessage(Diagnostic.Kind.ERROR,
+                        "Unexpected processing state: annotations still available after processing over");
+                return true;
+            }
+        }
+
+        if (annotations.isEmpty()) {
+            return true;
+        }
+
+        try {
+            JavaFile.builder(generatedPackageName,
+                    classBuilder.build())
+                    .build()
+                    .writeTo(filer);
+        } catch (IOException e) {
+            messager.printMessage(ERROR, e.toString());
+        }
+        return false;
     }
-}
-
-if (annotations.isEmpty()) {
-    return true;
-}
-
-try {
-    JavaFile.builder(generatedPackageName,
-            classBuilder.build())
-            .build()
-            .writeTo(filer);
-} catch (IOException e) {
-    messager.printMessage(ERROR, e.toString());
-}
-return false;
-}
 
     @Override
     public Set<String> getSupportedAnnotationTypes() {
