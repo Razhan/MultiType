@@ -21,30 +21,6 @@ import javax.lang.model.util.Elements;
 
 class DelegateInfoParser {
 
-    static Map<ClassName, Map<Integer, TypeElement>> collectTypeInfo(List<TypeNode> nodes, Map<TypeElement, ExecutableElement> typeMethods) {
-        Map<ClassName, Map<Integer, TypeElement>> res = new HashMap<>();
-        for (TypeNode node : nodes) {
-            Map<Integer, TypeElement> info;
-            for (Pair<ClassName, Integer> supportType : node.supportTypes) {
-                if (res.containsKey(supportType.first)) {
-                    info = res.get(supportType.first);
-                    if (info == null) {
-                        info = new HashMap<>();
-                    }
-
-                    info.put(supportType.second, node.element);
-                } else {
-                    info = new HashMap<>();
-                    info.put(supportType.second, node.element);
-                }
-
-                res.put(supportType.first, info);
-            }
-        }
-
-        return res;
-    }
-
     static List<TypeNode> collectDelegateTypeInfo(RoundEnvironment env, Elements elements) {
         List<TypeNode> typeInfo = new LinkedList<>();
         for (Element element : env.getElementsAnnotatedWith(Delegate.class)) {

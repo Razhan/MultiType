@@ -15,21 +15,19 @@ public class AnimalDelegatesManager extends AbsListDelegatesManager<Animal> {
 
     @Override
     public void setAdapter(AbsDelegationAdapter adapter) {
-//        AdapterTypeIndex.getInstance().setAdapter(adapter);
+        AdapterTypeIndex.getInstance().setAdapter(adapter);
     }
 
     @Override
     public int getItemViewType(@NonNull List<Animal> items, int position) {
-        return 0;
-//        return AdapterTypeIndex.getInstance().getItemViewType(items.get(position));
+        return AdapterTypeIndex.getInstance().getItemViewType(items.get(position));
     }
 
     @Nullable
     @Override
     @SuppressWarnings("unchecked")
     public AbsListDelegate<Animal> getDelegateForViewType(int viewType) {
-        return null;
-//        return (AbsListDelegate<Animal>) AdapterTypeIndex.getInstance().getDelegateByViewType(viewType);
+        return (AbsListDelegate<Animal>) AdapterTypeIndex.getInstance().getDelegateByViewType(viewType);
     }
 
 }
