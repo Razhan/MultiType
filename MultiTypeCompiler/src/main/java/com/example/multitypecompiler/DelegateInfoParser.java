@@ -111,7 +111,6 @@ class DelegateInfoParser {
 
             if (typeClassName.toString().equals(None.class.getName())) {
                 List<? extends TypeMirror> typeMirrors = getTypeArguments(element);
-
                 if (typeMirrors == null || typeMirrors.isEmpty()) {
                     throw new IllegalArgumentException("delegate对应类型没有正确设置");
                 }
