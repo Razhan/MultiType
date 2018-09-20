@@ -2,11 +2,12 @@ package com.example.multitypecompiler;
 
 import com.example.multitypeannotations.Delegate;
 import com.example.multitypeannotations.Keep;
-import com.example.multitypeannotations.None;
 import com.google.auto.service.AutoService;
+import com.squareup.javapoet.AnnotationSpec;
 import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.JavaFile;
 import com.squareup.javapoet.MethodSpec;
+import com.squareup.javapoet.ParameterSpec;
 import com.squareup.javapoet.ParameterizedTypeName;
 import com.squareup.javapoet.TypeName;
 import com.squareup.javapoet.TypeSpec;
@@ -14,8 +15,6 @@ import com.squareup.javapoet.TypeSpec;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
-import java.lang.reflect.ParameterizedType;
-import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -33,12 +32,15 @@ import javax.annotation.processing.RoundEnvironment;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.Modifier;
 import javax.lang.model.element.TypeElement;
+import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.Elements;
 import javax.tools.Diagnostic;
 
+import static com.example.multitypecompiler.DelegateInfoParser.collectAdapterInfo;
 import static com.example.multitypecompiler.DelegateInfoParser.collectDelegateLayoutInfo;
 import static com.example.multitypecompiler.DelegateInfoParser.collectDelegateTypeInfo;
 import static com.example.multitypecompiler.DelegateInfoParser.collectTypeMethodInfo;
+import static com.example.multitypecompiler.DelegateInfoParser.getTypeArguments;
 import static javax.tools.Diagnostic.Kind.ERROR;
 
 @AutoService(Processor.class)
@@ -66,9 +68,22 @@ public class MultiTypeProcessor extends AbstractProcessor {
 
     @Override
     public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment env) {
+        if (env.processingOver()) {
+            if (!annotations.isEmpty()) {
+                messager.printMessage(Diagnostic.Kind.ERROR,
+                        "Unexpected processing state: annotations still available after processing over");
+                return false;
+            }
+        }
+
+        if (annotations.isEmpty()) {
+            return false;
+        }
+
         List<TypeNode> typeInfo = collectDelegateTypeInfo(env, elementUtil);
         Map<TypeElement, ExecutableElement> typeMethods = collectTypeMethodInfo(env);
         Map<TypeElement, Integer> layouts = collectDelegateLayoutInfo(env);
+        List<TypeElement> adapterInfo = collectAdapterInfo(env);
 
         if (typeInfo.isEmpty()) {
             return false;
@@ -76,6 +91,7 @@ public class MultiTypeProcessor extends AbstractProcessor {
 
         TypeSpec.Builder classBuilder = generateDelegateIndexClass();
         TypeSpec.Builder infoBuilder = generateDelegateInfoClass();
+        Map<String, TypeSpec.Builder> managerBuilderMap = generateManagerClass(adapterInfo);
 
         classBuilder.addMethod(setAdapterMethod().build());
         classBuilder.addMethod(singletonMethod().build());
@@ -87,10 +103,13 @@ public class MultiTypeProcessor extends AbstractProcessor {
         classBuilder.addMethod(getTypeMethod().build());
         classBuilder.addMethod(getDelegateMethod().build());
 
-        boolean succeeded = createInfoFile(annotations, env, packageName, infoBuilder);
-        succeeded &= createInfoFile(annotations, env, packageName, classBuilder);
+        createInfoFile(packageName, infoBuilder);
+        createInfoFile(packageName, classBuilder);
+        for (Map.Entry<String, TypeSpec.Builder> entry : managerBuilderMap.entrySet()) {
+            createInfoFile(entry.getKey(), entry.getValue());
+        }
 
-        return succeeded;
+        return true;
     }
 
     private TypeSpec.Builder generateDelegateIndexClass() {
@@ -157,6 +176,72 @@ public class MultiTypeProcessor extends AbstractProcessor {
                 );
     }
 
+    private Map<String, TypeSpec.Builder> generateManagerClass(List<TypeElement> adapterInfo) {
+        ClassName AbsManager = ClassName.get("com.example.multitypelib.listadapter", "AbsListDelegatesManager");
+        ClassName AbsAdapter = ClassName.get("com.example.multitypelib", "AbsDelegationAdapter");
+        ClassName AbsDelegate = ClassName.get("com.example.multitypelib.listadapter", "AbsListDelegate");
+
+        ClassName generatedFullName = ClassName.get(packageName, delegateIndexClassName);
+        ClassName NonNull = ClassName.get("android.support.annotation", "NonNull");
+        ClassName list = ClassName.get("java.util", "List");
+
+        Map<String, TypeSpec.Builder> managerMap = new HashMap<>();
+
+        if (adapterInfo == null || adapterInfo.isEmpty()) {
+            return managerMap;
+        }
+
+        for (TypeElement adapterClass : adapterInfo) {
+            String packageName = ClassName.get(adapterClass).packageName();
+            String adapterClassName = ClassName.get(adapterClass).simpleName();
+            String managerClassName = adapterClassName + "Manager";
+
+            List<? extends TypeMirror> typeMirrors = getTypeArguments(adapterClass);
+            if (typeMirrors == null || typeMirrors.isEmpty()) {
+                throw new IllegalArgumentException("adapter对应类型没有正确设置");
+            }
+
+            ClassName typeClassName = ClassName.get(elementUtil.getTypeElement(typeMirrors.get(0).toString()));
+            TypeName itemListType = ParameterizedTypeName.get(list, typeClassName);
+
+            TypeSpec.Builder classBuilder = TypeSpec.classBuilder(managerClassName)
+                    .superclass(ParameterizedTypeName.get(AbsManager, typeClassName))
+                    .addModifiers(Modifier.PUBLIC)
+                    .addMethod(MethodSpec.methodBuilder("setAdapter")
+                            .addModifiers(Modifier.PUBLIC)
+                            .returns(void.class)
+                            .addAnnotation(Override.class)
+                            .addParameter(AbsAdapter, "adapter")
+                            .addStatement("$T.getInstance().setAdapter($N)", generatedFullName, "adapter")
+                            .build())
+                    .addMethod(MethodSpec.methodBuilder("getItemViewType")
+                            .addModifiers(Modifier.PUBLIC)
+                            .returns(int.class)
+                            .addAnnotation(Override.class)
+                            .addParameter(ParameterSpec.builder(itemListType, "items")
+                                    .addAnnotation(AnnotationSpec.builder(NonNull).build())
+                                    .build())
+                            .addParameter(int.class, "position")
+                            .addStatement("return $T.getInstance().getItemViewType($N.get($N))", generatedFullName, "items", "position")
+                            .build())
+                    .addMethod(MethodSpec.methodBuilder("getDelegateForViewType")
+                            .addModifiers(Modifier.PUBLIC)
+                            .returns(ParameterizedTypeName.get(AbsDelegate, typeClassName))
+                            .addAnnotation(Override.class)
+                            .addAnnotation(NonNull)
+                            .addAnnotation(AnnotationSpec.builder(SuppressWarnings.class)
+                                    .addMember("value", "$S","unchecked").build())
+                            .addParameter(int.class, "viewType")
+                            .addStatement("return ($T) $T.getInstance().getDelegateByViewType($N)",
+                                    ParameterizedTypeName.get(AbsDelegate, typeClassName), generatedFullName, "viewType")
+                            .build());
+
+            managerMap.put(packageName, classBuilder);
+        }
+
+        return managerMap;
+    }
+
     private MethodSpec.Builder setAdapterMethod() {
         ClassName adapterClass = ClassName.get(adapterPackage, adapterString);
         return MethodSpec
@@ -207,42 +292,17 @@ public class MultiTypeProcessor extends AbstractProcessor {
                     resId = layouts.get(nodes.get(i).element);
                 }
 
-                if (typeInfo.first.toString().equals(None.class.getName())) {
-                    String typeClassName = "typeClass" + String.valueOf(i);
-                    setDelegateInfoBuilder.addStatement("$T $N = $S", Class.class, typeClassName, null)
-                            .beginControlFlow("try")
-                            .addStatement("$T $N = $T.class.getGenericSuperclass()", Type.class, "superclass", ClassName.get(nodes.get(i).element))
-                            .addStatement("$N = ($T) (($T) $N).getActualTypeArguments()[$L]", typeClassName, Class.class, ParameterizedType.class, "superclass", 0)
-                            .addCode("\n")
-                            .beginControlFlow("if ($N == $S)", typeClassName, null)
-                            .addStatement("throw new $T($S)", IllegalArgumentException.class, "1111112")
-                            .endControlFlow()
-                            .addCode("$<} catch ($T $N) {", Exception.class, "ex")
-                            .addCode("\n")
-                            .addStatement("$>$N.printStackTrace()", "ex")
-                            .endControlFlow()
-                            .addStatement("$N.add(new $T($L, $N, $T.class, $N, $L, $L))",
-                                    "delegateInfoList",
-                                    DelegateInfoFullName,
-                                    index++,
-                                    "adapter",
-                                    ClassName.get(nodes.get(i).element),
-                                    typeClassName,
-                                    typeInfo.second,
-                                    resId
-                            );
-                } else {
-                    setDelegateInfoBuilder.addStatement("$N.add(new $T($L, $N, $T.class, $T.class, $L, $L))",
-                            "delegateInfoList",
-                            DelegateInfoFullName,
-                            index++,
-                            "adapter",
-                            ClassName.get(nodes.get(i).element),
-                            typeInfo.first,
-                            typeInfo.second,
-                            resId
-                    );
-                }
+                setDelegateInfoBuilder.addStatement("$N.add(new $T($L, $N, $T.class, $T.class, $L, $L))",
+                        "delegateInfoList",
+                        DelegateInfoFullName,
+                        index++,
+                        "adapter",
+                        ClassName.get(nodes.get(i).element),
+                        typeInfo.first,
+                        typeInfo.second,
+                        resId
+                );
+
             }
 
             if (i != nodes.size() - 1) {
@@ -384,20 +444,7 @@ public class MultiTypeProcessor extends AbstractProcessor {
                 .endControlFlow();
     }
 
-    private boolean createInfoFile(Set<? extends TypeElement> annotations, RoundEnvironment env,
-                                   String generatedPackageName, TypeSpec.Builder classBuilder) {
-        if (env.processingOver()) {
-            if (!annotations.isEmpty()) {
-                messager.printMessage(Diagnostic.Kind.ERROR,
-                        "Unexpected processing state: annotations still available after processing over");
-                return true;
-            }
-        }
-
-        if (annotations.isEmpty()) {
-            return true;
-        }
-
+    private void createInfoFile(String generatedPackageName, TypeSpec.Builder classBuilder) {
         try {
             JavaFile.builder(generatedPackageName,
                     classBuilder.build())
@@ -406,7 +453,6 @@ public class MultiTypeProcessor extends AbstractProcessor {
         } catch (IOException e) {
             messager.printMessage(ERROR, e.toString());
         }
-        return false;
     }
 
     @Override
