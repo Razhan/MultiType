@@ -16,6 +16,15 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
+
+    defaultConfig {
+        javaCompileOptions {
+            annotationProcessorOptions {
+                arguments = [ multipleTypeIndex : 'com.example.ran.multitype.ddd' ]
+            }
+        }
+    }
+
 }
 
 dependencies {

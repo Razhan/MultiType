@@ -1,7 +1,10 @@
 package com.example.multitypecompiler;
 
 import com.example.multitypeannotations.Delegate;
+import com.example.multitypeannotations.DelegateAdapter;
+import com.example.multitypeannotations.DelegateLayout;
 import com.example.multitypeannotations.Keep;
+import com.example.multitypeannotations.TypeMethod;
 import com.google.auto.service.AutoService;
 import com.squareup.javapoet.AnnotationSpec;
 import com.squareup.javapoet.ClassName;
@@ -16,7 +19,7 @@ import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
-import java.util.Collections;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -29,6 +32,8 @@ import javax.annotation.processing.Messager;
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.annotation.processing.Processor;
 import javax.annotation.processing.RoundEnvironment;
+import javax.annotation.processing.SupportedOptions;
+import javax.lang.model.SourceVersion;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.Modifier;
 import javax.lang.model.element.TypeElement;
@@ -36,34 +41,55 @@ import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.Elements;
 import javax.tools.Diagnostic;
 
-import static com.example.multitypecompiler.DelegateInfoParser.collectAdapterInfo;
-import static com.example.multitypecompiler.DelegateInfoParser.collectDelegateLayoutInfo;
-import static com.example.multitypecompiler.DelegateInfoParser.collectDelegateTypeInfo;
-import static com.example.multitypecompiler.DelegateInfoParser.collectTypeMethodInfo;
-import static com.example.multitypecompiler.DelegateInfoParser.getTypeArguments;
+import static com.example.multitypecompiler.ProcessingUtils.collectAdapterInfo;
+import static com.example.multitypecompiler.ProcessingUtils.collectDelegateInfo;
+import static com.example.multitypecompiler.ProcessingUtils.collectDelegateLayoutInfo;
+import static com.example.multitypecompiler.ProcessingUtils.collectTypeMethodInfo;
+import static com.example.multitypecompiler.ProcessingUtils.getTypeArguments;
 import static javax.tools.Diagnostic.Kind.ERROR;
 
 @AutoService(Processor.class)
-public class MultiTypeProcessor extends AbstractProcessor {
+@SupportedOptions("eventBusIndex")
+public class MultipleTypeProcessor extends AbstractProcessor {
+
+    private static final String OPTION_MULTIPLE_TYPE_INDEX = "multipleTypeIndex";
 
     private Filer filer;
     private Messager messager;
     private Elements elementUtil;
 
-    private String packageName = "com.example.ran.multitype";
-    private String delegateIndexClassName = "AdapterTypeIndex";
-    private String delegateInfoClassName = "DelegateInfo";
+    private String packageName;
 
-    private String adapterPackage = "com.example.multitypelib";
-    private String adapterString = "AbsDelegationAdapter";
-    private String delegateString = "AdapterDelegate";
+    private ClassName listNameClass;
+    private ClassName mapNameClass;
+
+    private ClassName adapterNameClass;
+    private ClassName delegateNameClass;
+
+    private ClassName delegateInfoNameClass;
+    private ClassName delegateIndexNameClass;
 
     @Override
     public synchronized void init(ProcessingEnvironment processingEnv) {
         super.init(processingEnv);
+
         filer = processingEnv.getFiler();
         messager = processingEnv.getMessager();
         elementUtil = processingEnv.getElementUtils();
+    }
+
+    private void initClassData(String index) {
+        int lastPeriod = index.lastIndexOf('.');
+        packageName = lastPeriod != -1 ? index.substring(0, lastPeriod) : null;
+
+        listNameClass = ClassName.get(List.class);
+        mapNameClass = ClassName.get(Map.class);
+
+        adapterNameClass = ClassName.bestGuess(NameStore.ADAPTER_CLASS);
+        delegateNameClass = ClassName.bestGuess(NameStore.DELEGATE_CLASS);
+
+        delegateInfoNameClass = ClassName.get(packageName, NameStore.DELEGATE_INFO);
+        delegateIndexNameClass = ClassName.get(packageName, NameStore.DELEGATE_INDEX);
     }
 
     @Override
@@ -80,55 +106,62 @@ public class MultiTypeProcessor extends AbstractProcessor {
             return false;
         }
 
-        List<TypeNode> typeInfo = collectDelegateTypeInfo(env, elementUtil);
-        Map<TypeElement, ExecutableElement> typeMethods = collectTypeMethodInfo(env);
-        Map<TypeElement, Integer> layouts = collectDelegateLayoutInfo(env);
-        List<TypeElement> adapterInfo = collectAdapterInfo(env);
+        try {
+            String index = processingEnv.getOptions().get(OPTION_MULTIPLE_TYPE_INDEX);
+            if (index == null) {
+                messager.printMessage(Diagnostic.Kind.ERROR, "No option " + OPTION_MULTIPLE_TYPE_INDEX +
+                        " passed to annotation processor");
+                return false;
+            }
 
-        if (typeInfo.isEmpty()) {
-            return false;
-        }
+            initClassData(index);
 
-        TypeSpec.Builder classBuilder = generateDelegateIndexClass();
-        TypeSpec.Builder infoBuilder = generateDelegateInfoClass();
-        Map<String, TypeSpec.Builder> managerBuilderMap = generateManagerClass(adapterInfo);
+            List<TypeNode> typeInfo = collectDelegateInfo(env, elementUtil);
+            Map<TypeElement, ExecutableElement> typeMethods = collectTypeMethodInfo(env);
+            Map<TypeElement, Integer> layouts = collectDelegateLayoutInfo(env);
+            List<TypeElement> adapterInfo = collectAdapterInfo(env);
 
-        classBuilder.addMethod(setAdapterMethod().build());
-        classBuilder.addMethod(singletonMethod().build());
-        classBuilder.addMethod(setDelegateInfoMethod(typeInfo, layouts).build());
-        classBuilder.addMethod(setTypeInfoMethod().build());
+            if (typeInfo.isEmpty()) {
+                return false;
+            }
 
-        classBuilder.addMethod(setTypeMethodInfoMethod(typeMethods).build());
+            TypeSpec.Builder classBuilder = generateDelegateIndexClass();
+            TypeSpec.Builder infoBuilder = generateDelegateInfoClass();
+            Map<String, TypeSpec.Builder> managerBuilderMap = generateManagerClass(adapterInfo);
 
-        classBuilder.addMethod(getTypeMethod().build());
-        classBuilder.addMethod(getDelegateMethod().build());
+            classBuilder.addMethod(setAdapterMethod().build());
+            classBuilder.addMethod(singletonMethod().build());
+            classBuilder.addMethod(setDelegateInfoMethod(typeInfo, layouts).build());
+            classBuilder.addMethod(setTypeInfoMethod().build());
 
-        createInfoFile(packageName, infoBuilder);
-        createInfoFile(packageName, classBuilder);
-        for (Map.Entry<String, TypeSpec.Builder> entry : managerBuilderMap.entrySet()) {
-            createInfoFile(entry.getKey(), entry.getValue());
+            classBuilder.addMethod(setTypeMethodInfoMethod(typeMethods).build());
+
+            classBuilder.addMethod(getTypeMethod().build());
+            classBuilder.addMethod(getDelegateMethod().build());
+
+            createFile(packageName, infoBuilder);
+            createFile(packageName, classBuilder);
+            for (Map.Entry<String, TypeSpec.Builder> entry : managerBuilderMap.entrySet()) {
+                createFile(entry.getKey(), entry.getValue());
+            }
+        } catch (RuntimeException e) {
+            e.printStackTrace();
+            messager.printMessage(Diagnostic.Kind.ERROR, "Unexpected error in MultipleTypeProcessor: " + e);
         }
 
         return true;
     }
 
     private TypeSpec.Builder generateDelegateIndexClass() {
-        ClassName generatedFullName = ClassName.get(packageName, delegateIndexClassName);
-        ClassName adapterFullName = ClassName.get(adapterPackage, adapterString);
-        ClassName DelegateInfoFullName = ClassName.get(packageName, delegateInfoClassName);
+        TypeName delegateInfo = ParameterizedTypeName.get(listNameClass, delegateInfoNameClass);
+        TypeName typeMethodInfo = ParameterizedTypeName.get(mapNameClass, ClassName.get(Class.class), ClassName.get(Method.class));
+        TypeName typeInfo = ParameterizedTypeName.get(mapNameClass, ClassName.get(Class.class),
+                ParameterizedTypeName.get(mapNameClass, ClassName.get(Integer.class), ClassName.get(Integer.class)));
 
-        ClassName list = ClassName.get("java.util", "List");
-        ClassName map = ClassName.get("java.util", "Map");
-
-        TypeName delegateInfo = ParameterizedTypeName.get(list, DelegateInfoFullName);
-        TypeName typeMethodInfo = ParameterizedTypeName.get(map, ClassName.get(Class.class), ClassName.get(Method.class));
-        TypeName typeInfo = ParameterizedTypeName.get(map, ClassName.get(Class.class),
-                ParameterizedTypeName.get(map, ClassName.get(Integer.class), ClassName.get(Integer.class)));
-
-        return TypeSpec.classBuilder(generatedFullName)
+        return TypeSpec.classBuilder(delegateIndexNameClass)
                 .addModifiers(Modifier.PUBLIC)
-                .addField(adapterFullName, "adapter", Modifier.PRIVATE)
-                .addField(generatedFullName, "instance", Modifier.PRIVATE, Modifier.STATIC, Modifier.VOLATILE)
+                .addField(adapterNameClass, "adapter", Modifier.PRIVATE)
+                .addField(delegateIndexNameClass, "instance", Modifier.PRIVATE, Modifier.STATIC, Modifier.VOLATILE)
                 .addField(delegateInfo, "delegateInfoList", Modifier.PRIVATE)
                 .addField(typeMethodInfo, "typeMethodInfo", Modifier.PRIVATE)
                 .addField(typeInfo, "typeInfo", Modifier.PRIVATE)
@@ -142,21 +175,17 @@ public class MultiTypeProcessor extends AbstractProcessor {
     }
 
     private TypeSpec.Builder generateDelegateInfoClass() {
-        ClassName generatedFullName = ClassName.get(packageName, delegateInfoClassName);
-        ClassName adapterFullName = ClassName.get(adapterPackage, adapterString);
-        ClassName delegateClassName = ClassName.get(adapterPackage, delegateString);
-
-        return TypeSpec.classBuilder(generatedFullName)
+        return TypeSpec.classBuilder(delegateInfoNameClass)
                 .addModifiers(Modifier.PUBLIC)
                 .addField(int.class, "index", Modifier.PUBLIC)
                 .addField(int.class, "subType", Modifier.PUBLIC)
                 .addField(Class.class, "typeClass")
-                .addField(delegateClassName, "delegate")
+                .addField(delegateNameClass, "delegate")
                 .addAnnotation(Keep.class)
                 .addMethod(MethodSpec.constructorBuilder()
                         .addModifiers(Modifier.PUBLIC)
                         .addParameter(int.class, "index")
-                        .addParameter(adapterFullName, "adapter")
+                        .addParameter(adapterNameClass, "adapter")
                         .addParameter(Class.class, "clazz")
                         .addParameter(Class.class, "typeClass")
                         .addParameter(int.class, "subType")
@@ -166,8 +195,8 @@ public class MultiTypeProcessor extends AbstractProcessor {
                         .addStatement("this.$N = $N", "typeClass", "typeClass")
                         .addCode("\n")
                         .beginControlFlow("try")
-                        .addStatement("$T $N = $N.getDeclaredConstructor($T.class, $T.class)", Constructor.class, "constructor", "clazz", adapterFullName, int.class)
-                        .addStatement("this.$N = ($T) $N.newInstance($N, $L)", "delegate", delegateClassName, "constructor", "adapter", "resId")
+                        .addStatement("$T $N = $N.getDeclaredConstructor($T.class, $T.class)", Constructor.class, "constructor", "clazz", adapterNameClass, int.class)
+                        .addStatement("this.$N = ($T) $N.newInstance($N, $L)", "delegate", delegateNameClass, "constructor", "adapter", "resId")
                         .addCode("$<} catch ($T $N) {", Exception.class, "ex")
                         .addCode("\n")
                         .addStatement("$>$N.printStackTrace()", "ex")
@@ -177,13 +206,7 @@ public class MultiTypeProcessor extends AbstractProcessor {
     }
 
     private Map<String, TypeSpec.Builder> generateManagerClass(List<TypeElement> adapterInfo) {
-        ClassName AbsManager = ClassName.get("com.example.multitypelib.listadapter", "AbsListDelegatesManager");
-        ClassName AbsAdapter = ClassName.get("com.example.multitypelib", "AbsDelegationAdapter");
-        ClassName AbsDelegate = ClassName.get("com.example.multitypelib.listadapter", "AbsListDelegate");
-
-        ClassName generatedFullName = ClassName.get(packageName, delegateIndexClassName);
         ClassName NonNull = ClassName.get("android.support.annotation", "NonNull");
-        ClassName list = ClassName.get("java.util", "List");
 
         Map<String, TypeSpec.Builder> managerMap = new HashMap<>();
 
@@ -202,17 +225,17 @@ public class MultiTypeProcessor extends AbstractProcessor {
             }
 
             ClassName typeClassName = ClassName.get(elementUtil.getTypeElement(typeMirrors.get(0).toString()));
-            TypeName itemListType = ParameterizedTypeName.get(list, typeClassName);
+            TypeName itemListType = ParameterizedTypeName.get(listNameClass, typeClassName);
 
             TypeSpec.Builder classBuilder = TypeSpec.classBuilder(managerClassName)
-                    .superclass(ParameterizedTypeName.get(AbsManager, typeClassName))
+                    .superclass(ParameterizedTypeName.get(ClassName.bestGuess(NameStore.LIST_MANAGER_CLASS), typeClassName))
                     .addModifiers(Modifier.PUBLIC)
                     .addMethod(MethodSpec.methodBuilder("setAdapter")
                             .addModifiers(Modifier.PUBLIC)
                             .returns(void.class)
                             .addAnnotation(Override.class)
-                            .addParameter(AbsAdapter, "adapter")
-                            .addStatement("$T.getInstance().setAdapter($N)", generatedFullName, "adapter")
+                            .addParameter(adapterNameClass, "adapter")
+                            .addStatement("$T.getInstance().setAdapter($N)", delegateIndexNameClass, "adapter")
                             .build())
                     .addMethod(MethodSpec.methodBuilder("getItemViewType")
                             .addModifiers(Modifier.PUBLIC)
@@ -222,18 +245,18 @@ public class MultiTypeProcessor extends AbstractProcessor {
                                     .addAnnotation(AnnotationSpec.builder(NonNull).build())
                                     .build())
                             .addParameter(int.class, "position")
-                            .addStatement("return $T.getInstance().getItemViewType($N.get($N))", generatedFullName, "items", "position")
+                            .addStatement("return $T.getInstance().getItemViewType($N.get($N))", delegateIndexNameClass, "items", "position")
                             .build())
                     .addMethod(MethodSpec.methodBuilder("getDelegateForViewType")
                             .addModifiers(Modifier.PUBLIC)
-                            .returns(ParameterizedTypeName.get(AbsDelegate, typeClassName))
+                            .returns(ParameterizedTypeName.get(ClassName.bestGuess(NameStore.LIST_DELEGATE_CLASS), typeClassName))
                             .addAnnotation(Override.class)
                             .addAnnotation(NonNull)
                             .addAnnotation(AnnotationSpec.builder(SuppressWarnings.class)
                                     .addMember("value", "$S","unchecked").build())
                             .addParameter(int.class, "viewType")
                             .addStatement("return ($T) $T.getInstance().getDelegateByViewType($N)",
-                                    ParameterizedTypeName.get(AbsDelegate, typeClassName), generatedFullName, "viewType")
+                                    ParameterizedTypeName.get(ClassName.bestGuess(NameStore.LIST_DELEGATE_CLASS), typeClassName), delegateIndexNameClass, "viewType")
                             .build());
 
             managerMap.put(packageName, classBuilder);
@@ -243,25 +266,23 @@ public class MultiTypeProcessor extends AbstractProcessor {
     }
 
     private MethodSpec.Builder setAdapterMethod() {
-        ClassName adapterClass = ClassName.get(adapterPackage, adapterString);
         return MethodSpec
                 .methodBuilder("setAdapter")
                 .addModifiers(Modifier.PUBLIC)
-                .addParameter(adapterClass, "adapter")
+                .addParameter(adapterNameClass, "adapter")
                 .addStatement("this.$N = $N", "adapter", "adapter")
                 .returns(void.class);
     }
 
     private MethodSpec.Builder singletonMethod() {
-        ClassName generatedFullName = ClassName.get(packageName, delegateIndexClassName);
         return MethodSpec
                 .methodBuilder("getInstance")
                 .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
-                .returns(ClassName.get(packageName, delegateIndexClassName))
+                .returns(delegateIndexNameClass)
                 .beginControlFlow("if ($N == $S)", "instance", null)
-                .beginControlFlow("synchronized ($T.class)", generatedFullName)
+                .beginControlFlow("synchronized ($T.class)", delegateIndexNameClass)
                 .beginControlFlow("if ($N == $S)", "instance", null)
-                .addStatement("$N = new $T()", "instance", generatedFullName)
+                .addStatement("$N = new $T()", "instance", delegateIndexNameClass)
                 .endControlFlow()
                 .endControlFlow()
                 .endControlFlow()
@@ -270,8 +291,6 @@ public class MultiTypeProcessor extends AbstractProcessor {
     }
 
     private MethodSpec.Builder setDelegateInfoMethod(List<TypeNode> nodes, Map<TypeElement, Integer> layouts) {
-        ClassName DelegateInfoFullName = ClassName.get(packageName, delegateInfoClassName);
-
         MethodSpec.Builder setDelegateInfoBuilder = MethodSpec.methodBuilder("setDelegateInfo")
                 .addModifiers(Modifier.PRIVATE)
                 .returns(void.class);
@@ -294,7 +313,7 @@ public class MultiTypeProcessor extends AbstractProcessor {
 
                 setDelegateInfoBuilder.addStatement("$N.add(new $T($L, $N, $T.class, $T.class, $L, $L))",
                         "delegateInfoList",
-                        DelegateInfoFullName,
+                        delegateInfoNameClass,
                         index++,
                         "adapter",
                         ClassName.get(nodes.get(i).element),
@@ -314,9 +333,7 @@ public class MultiTypeProcessor extends AbstractProcessor {
     }
 
     private MethodSpec.Builder setTypeInfoMethod() {
-        ClassName map = ClassName.get("java.util", "Map");
-        ClassName DelegateInfoFullName = ClassName.get(packageName, delegateInfoClassName);
-        TypeName typeInfo = ParameterizedTypeName.get(map, ClassName.get(Integer.class), ClassName.get(Integer.class));
+        TypeName typeInfo = ParameterizedTypeName.get(mapNameClass, ClassName.get(Integer.class), ClassName.get(Integer.class));
 
         MethodSpec.Builder setDelegateInfoBuilder = MethodSpec.methodBuilder("setTypeInfo")
                 .addModifiers(Modifier.PRIVATE)
@@ -328,7 +345,7 @@ public class MultiTypeProcessor extends AbstractProcessor {
                 .addCode("\n")
                 .addStatement("$N = new $T<>()", "typeInfo", HashMap.class)
                 .addCode("\n")
-                .beginControlFlow("for ($T $N : $N)", DelegateInfoFullName, "delegateInfo", "delegateInfoList")
+                .beginControlFlow("for ($T $N : $N)", delegateInfoNameClass, "delegateInfo", "delegateInfoList")
                 .addStatement("$T $N = $N.get($N.$N)", typeInfo , "info", "typeInfo", "delegateInfo", "typeClass")
                 .addCode("\n")
                 .beginControlFlow("if ($N == $S)", "info", null)
@@ -343,19 +360,16 @@ public class MultiTypeProcessor extends AbstractProcessor {
     }
 
     private MethodSpec.Builder getDelegateMethod() {
-        ClassName delegateClassName = ClassName.get(adapterPackage, delegateString);
-        ClassName DelegateInfoFullName = ClassName.get(packageName, delegateInfoClassName);
-
         return MethodSpec
                 .methodBuilder("getDelegateByViewType")
                 .addModifiers(Modifier.PUBLIC)
                 .addParameter(int.class, "viewType")
-                .returns(delegateClassName)
+                .returns(delegateNameClass)
                 .beginControlFlow("if ($N == $S || $N.isEmpty())", "delegateInfoList", null, "delegateInfoList")
                 .addStatement("throw new $T($T.format($S, $L))", IllegalArgumentException.class, String.class, "Can not Find Adapter Delegate for Type %d", "viewType")
                 .endControlFlow()
                 .addCode("\n")
-                .addStatement("$T $N = $N.get($L)", DelegateInfoFullName, "delegateInfo", "delegateInfoList", "viewType")
+                .addStatement("$T $N = $N.get($L)", delegateInfoNameClass, "delegateInfo", "delegateInfoList", "viewType")
                 .beginControlFlow("if ($N == $S)", "delegateInfo", null)
                 .addStatement("throw new $T($T.format($S, $L))", IllegalArgumentException.class, String.class, "Can not Find Adapter Delegate for Type %d", "viewType")
                 .endControlFlow()
@@ -402,8 +416,7 @@ public class MultiTypeProcessor extends AbstractProcessor {
     }
 
     private MethodSpec.Builder getTypeMethod() {
-        ClassName map = ClassName.get("java.util", "Map");
-        TypeName typeInfo = ParameterizedTypeName.get(map, ClassName.get(Integer.class), ClassName.get(Integer.class));
+        TypeName typeInfo = ParameterizedTypeName.get(mapNameClass, ClassName.get(Integer.class), ClassName.get(Integer.class));
 
         return MethodSpec
                 .methodBuilder("getItemViewType")
@@ -439,7 +452,7 @@ public class MultiTypeProcessor extends AbstractProcessor {
                 .endControlFlow();
     }
 
-    private void createInfoFile(String generatedPackageName, TypeSpec.Builder classBuilder) {
+    private void createFile(String generatedPackageName, TypeSpec.Builder classBuilder) {
         try {
             JavaFile.builder(generatedPackageName,
                     classBuilder.build())
@@ -452,8 +465,17 @@ public class MultiTypeProcessor extends AbstractProcessor {
 
     @Override
     public Set<String> getSupportedAnnotationTypes() {
-        return new TreeSet<>(Collections.singletonList(
-                Delegate.class.getCanonicalName()));
+        return new TreeSet<>(Arrays.asList(
+                Delegate.class.getCanonicalName(),
+                DelegateLayout.class.getCanonicalName(),
+                DelegateAdapter.class.getCanonicalName(),
+                TypeMethod.class.getCanonicalName(),
+                Keep.class.getCanonicalName()));
+    }
+
+    @Override
+    public SourceVersion getSupportedSourceVersion() {
+        return SourceVersion.latest();
     }
 
 }

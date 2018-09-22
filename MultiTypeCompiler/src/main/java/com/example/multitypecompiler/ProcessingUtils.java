@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.Map;
 
 import javax.annotation.processing.RoundEnvironment;
+import javax.annotation.processing.SupportedOptions;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.TypeElement;
@@ -29,9 +30,9 @@ import javax.lang.model.type.TypeVariable;
 import javax.lang.model.util.Elements;
 import javax.lang.model.util.SimpleTypeVisitor6;
 
-class DelegateInfoParser {
+class ProcessingUtils {
 
-    static List<TypeNode> collectDelegateTypeInfo(RoundEnvironment env, Elements elementUtils) {
+    static List<TypeNode> collectDelegateInfo(RoundEnvironment env, Elements elementUtils) {
         List<TypeNode> typeInfo = new LinkedList<>();
         for (Element element : env.getElementsAnnotatedWith(Delegate.class)) {
             if (!(element instanceof TypeElement)) {

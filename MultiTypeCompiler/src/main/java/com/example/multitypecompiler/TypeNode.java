@@ -15,4 +15,5 @@ public class TypeNode {
         this.element = element;
         this.supportTypes = supportTypes;
     }
+
 }
