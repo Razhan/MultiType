@@ -49,10 +49,10 @@ import static com.example.multitypecompiler.ProcessingUtils.getTypeArguments;
 import static javax.tools.Diagnostic.Kind.ERROR;
 
 @AutoService(Processor.class)
-@SupportedOptions("eventBusIndex")
+@SupportedOptions("multipleTypeIndex")
 public class MultipleTypeProcessor extends AbstractProcessor {
 
-    private static final String OPTION_MULTIPLE_TYPE_INDEX = "multipleTypeIndex";
+    private static final String OPTION_MULTIPLE_TYPE_INDEX = "multipleTypePackage";
 
     private Filer filer;
     private Messager messager;
@@ -78,9 +78,8 @@ public class MultipleTypeProcessor extends AbstractProcessor {
         elementUtil = processingEnv.getElementUtils();
     }
 
-    private void initClassData(String index) {
-        int lastPeriod = index.lastIndexOf('.');
-        packageName = lastPeriod != -1 ? index.substring(0, lastPeriod) : null;
+    private void initClassData(String packageString) {
+        packageName = packageString;
 
         listNameClass = ClassName.get(List.class);
         mapNameClass = ClassName.get(Map.class);
@@ -107,14 +106,14 @@ public class MultipleTypeProcessor extends AbstractProcessor {
         }
 
         try {
-            String index = processingEnv.getOptions().get(OPTION_MULTIPLE_TYPE_INDEX);
-            if (index == null) {
+            String packageString = processingEnv.getOptions().get(OPTION_MULTIPLE_TYPE_INDEX);
+            if (packageString == null) {
                 messager.printMessage(Diagnostic.Kind.ERROR, "No option " + OPTION_MULTIPLE_TYPE_INDEX +
                         " passed to annotation processor");
                 return false;
             }
 
-            initClassData(index);
+            initClassData(packageString);
 
             List<TypeNode> typeInfo = collectDelegateInfo(env, elementUtil);
             Map<TypeElement, ExecutableElement> typeMethods = collectTypeMethodInfo(env);
@@ -440,7 +439,7 @@ public class MultipleTypeProcessor extends AbstractProcessor {
                 .addCode("\n")
                 .addStatement("$T $N = $N.get($N)", Method.class, "typeMethod", "typeMethodInfo", "itemClass")
                 .beginControlFlow("if ($N == null)", "typeMethod")
-                .addStatement("throw new $T($S)", IllegalArgumentException.class, "没找到方法")
+                .addStatement("throw new $T($T.format($S, $N.getName()))", RuntimeException.class, String.class, "Can not find the Method to get subtype for %s", "itemClass")
                 .endControlFlow()
                 .addCode("\n")
                 .beginControlFlow("try")
@@ -448,7 +447,7 @@ public class MultipleTypeProcessor extends AbstractProcessor {
                 .addStatement("return $N.get($N)", "delegateMap", "subType")
                 .addCode("$<} catch ($T $N) {", Exception.class, "ex")
                 .addCode("\n")
-                .addStatement("$>throw new $T($S)", IllegalArgumentException.class, "执行子类型方法异常")
+                .addStatement("$>return $L", -1)
                 .endControlFlow();
     }
 

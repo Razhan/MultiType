@@ -13,7 +13,6 @@ import com.example.ran.multitype.adapter.ListAdapter;
 import java.util.ArrayList;
 import java.util.List;
 
-//todo 防止对应多种delegate
 public class MainActivity extends AppCompatActivity {
 
     private RecyclerView recyclerView;

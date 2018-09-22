@@ -20,7 +20,7 @@ android {
     defaultConfig {
         javaCompileOptions {
             annotationProcessorOptions {
-                arguments = [ multipleTypeIndex : 'com.example.ran.multitype.ddd' ]
+                arguments = [ multipleTypePackage : 'com.example.ran.multitype' ]
             }
         }
     }
