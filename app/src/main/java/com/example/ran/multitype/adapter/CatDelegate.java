@@ -4,10 +4,9 @@ import android.support.annotation.NonNull;
 
 import com.example.multitypeannotations.Delegate;
 import com.example.multitypeannotations.DelegateLayout;
-import com.example.multitypeannotations.Type;
-import com.example.multitypelib.AbsDelegationAdapter;
+import com.example.multitypelib.BaseDelegationAdapter;
 import com.example.multitypelib.ViewHolder;
-import com.example.multitypelib.listadapter.AbsSubListDelegate;
+import com.example.multitypelib.BaseSubListDelegate;
 import com.example.ran.multitype.R;
 import com.example.ran.multitype.model.Animal;
 import com.example.ran.multitype.model.Cat;
@@ -16,9 +15,9 @@ import java.util.List;
 
 @Delegate
 @DelegateLayout(LAYOUT = R.layout.item_cat)
-public class CatDelegate extends AbsSubListDelegate<Cat, Animal> {
+public class CatDelegate extends BaseSubListDelegate<Cat, Animal> {
 
-    public CatDelegate(AbsDelegationAdapter adapter, int layoutId) {
+    public CatDelegate(BaseDelegationAdapter adapter, int layoutId) {
         super(adapter, layoutId);
     }
 

@@ -1,17 +1,12 @@
-package com.example.multitypelib.listadapter;
+package com.example.multitypelib;
 
 import android.support.annotation.NonNull;
-import android.support.v7.widget.RecyclerView;
-
-import com.example.multitypelib.AbsDelegationAdapter;
-import com.example.multitypelib.AdapterDelegate;
-import com.example.multitypelib.ViewHolder;
 
 import java.util.List;
 
-public abstract class AbsSubListDelegate<I extends T, T> extends AbsListDelegate<T> {
+public abstract class BaseSubListDelegate<I extends T, T> extends BaseAdapterDelegate<T> {
 
-    public AbsSubListDelegate(AbsDelegationAdapter adapter, int layoutId) {
+    public BaseSubListDelegate(BaseDelegationAdapter adapter, int layoutId) {
         super(adapter, layoutId);
     }
 

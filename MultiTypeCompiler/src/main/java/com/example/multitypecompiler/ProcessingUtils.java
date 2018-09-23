@@ -43,7 +43,7 @@ class ProcessingUtils {
         if (checkDelegateNode(typeInfo)) {
             return typeInfo;
         } else {
-            throw new IllegalArgumentException("One Class with specific subtype can only correspond to One Delegate");
+            throw new IllegalArgumentException("One Class with specific subtype Can Only correspond to One Delegate");
         }
     }
 

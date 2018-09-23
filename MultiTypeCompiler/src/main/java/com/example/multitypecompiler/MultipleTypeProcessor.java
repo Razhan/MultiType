@@ -65,6 +65,7 @@ public class MultipleTypeProcessor extends AbstractProcessor {
 
     private ClassName adapterNameClass;
     private ClassName delegateNameClass;
+    private ClassName managerNameClass;
 
     private ClassName delegateInfoNameClass;
     private ClassName delegateIndexNameClass;
@@ -86,6 +87,7 @@ public class MultipleTypeProcessor extends AbstractProcessor {
 
         adapterNameClass = ClassName.bestGuess(NameStore.ADAPTER_CLASS);
         delegateNameClass = ClassName.bestGuess(NameStore.DELEGATE_CLASS);
+        managerNameClass = ClassName.bestGuess(NameStore.MANAGER_CLASS);
 
         delegateInfoNameClass = ClassName.get(packageName, NameStore.DELEGATE_INFO);
         delegateIndexNameClass = ClassName.get(packageName, NameStore.DELEGATE_INDEX);
@@ -220,14 +222,14 @@ public class MultipleTypeProcessor extends AbstractProcessor {
 
             List<? extends TypeMirror> typeMirrors = getTypeArguments(adapterClass);
             if (typeMirrors == null || typeMirrors.isEmpty()) {
-                throw new IllegalArgumentException("adapter对应类型没有正确设置");
+                throw new RuntimeException("adapter does not have corresponding type");
             }
 
             ClassName typeClassName = ClassName.get(elementUtil.getTypeElement(typeMirrors.get(0).toString()));
             TypeName itemListType = ParameterizedTypeName.get(listNameClass, typeClassName);
 
             TypeSpec.Builder classBuilder = TypeSpec.classBuilder(managerClassName)
-                    .superclass(ParameterizedTypeName.get(ClassName.bestGuess(NameStore.LIST_MANAGER_CLASS), typeClassName))
+                    .superclass(ParameterizedTypeName.get(managerNameClass, typeClassName))
                     .addModifiers(Modifier.PUBLIC)
                     .addMethod(MethodSpec.methodBuilder("setAdapter")
                             .addModifiers(Modifier.PUBLIC)
@@ -248,14 +250,14 @@ public class MultipleTypeProcessor extends AbstractProcessor {
                             .build())
                     .addMethod(MethodSpec.methodBuilder("getDelegateForViewType")
                             .addModifiers(Modifier.PUBLIC)
-                            .returns(ParameterizedTypeName.get(ClassName.bestGuess(NameStore.LIST_DELEGATE_CLASS), typeClassName))
+                            .returns(ParameterizedTypeName.get(delegateNameClass, typeClassName))
                             .addAnnotation(Override.class)
                             .addAnnotation(NonNull)
                             .addAnnotation(AnnotationSpec.builder(SuppressWarnings.class)
                                     .addMember("value", "$S","unchecked").build())
                             .addParameter(int.class, "viewType")
                             .addStatement("return ($T) $T.getInstance().getDelegateByViewType($N)",
-                                    ParameterizedTypeName.get(ClassName.bestGuess(NameStore.LIST_DELEGATE_CLASS), typeClassName), delegateIndexNameClass, "viewType")
+                                    ParameterizedTypeName.get(delegateNameClass, typeClassName), delegateIndexNameClass, "viewType")
                             .build());
 
             managerMap.put(packageName, classBuilder);

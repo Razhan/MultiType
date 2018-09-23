@@ -7,24 +7,24 @@ import android.view.ViewGroup;
 import java.util.Collections;
 import java.util.List;
 
-public abstract class AbsDelegatesManager<T> {
+public abstract class BaseDelegatesManager<T> {
 
     protected static final int FALLBACK_DELEGATE_VIEW_TYPE = Integer.MAX_VALUE - 1;
     private static final List<Object> PAYLOADS_EMPTY_LIST = Collections.emptyList();
 
-    private AdapterDelegate<T> fallbackDelegate;
+    private BaseAdapterDelegate<T> fallbackDelegate;
 
-    public abstract int getItemViewType(@NonNull T items, int position);
+    public abstract int getItemViewType(@NonNull List<T> items, int position);
 
     @Nullable
-    public abstract AdapterDelegate<T> getDelegateForViewType(int viewType);
+    public abstract BaseAdapterDelegate<T> getDelegateForViewType(int viewType);
 
-    public void setAdapter(AbsDelegationAdapter adapter) {
+    public void setAdapter(BaseDelegationAdapter adapter) {
     }
 
     @NonNull
     public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        AdapterDelegate<T> delegate = getDelegateForViewType(viewType);
+        BaseAdapterDelegate<T> delegate = getDelegateForViewType(viewType);
         if (delegate == null) {
             throw new NullPointerException("No Delegate added for ViewType " + viewType);
         }
@@ -40,8 +40,8 @@ public abstract class AbsDelegatesManager<T> {
         return vh;
     }
 
-    public void onBindViewHolder(@NonNull T items, int position, @NonNull ViewHolder holder, List payloads) {
-        AdapterDelegate<T> delegate = getDelegateForViewType(holder.getItemViewType());
+    public void onBindViewHolder(@NonNull List<T> items, int position, @NonNull ViewHolder holder, List<Object> payloads) {
+        BaseAdapterDelegate<T> delegate = getDelegateForViewType(holder.getItemViewType());
         if (delegate == null) {
             throw new NullPointerException("No delegate found for item at position = "
                     + position
@@ -51,12 +51,12 @@ public abstract class AbsDelegatesManager<T> {
         delegate.onBindViewHolder(items, position, holder, payloads != null ? payloads : PAYLOADS_EMPTY_LIST);
     }
 
-    public void onBindViewHolder(@NonNull T items, int position, @NonNull ViewHolder holder) {
+    public void onBindViewHolder(@NonNull List<T> items, int position, @NonNull ViewHolder holder) {
         onBindViewHolder(items, position, holder, PAYLOADS_EMPTY_LIST);
     }
 
     public void onViewRecycled(@NonNull ViewHolder holder) {
-        AdapterDelegate<T> delegate = getDelegateForViewType(holder.getItemViewType());
+        BaseAdapterDelegate<T> delegate = getDelegateForViewType(holder.getItemViewType());
         if (delegate == null) {
             throw new NullPointerException("No delegate found for "
                     + holder
@@ -69,7 +69,7 @@ public abstract class AbsDelegatesManager<T> {
     }
 
     public boolean onFailedToRecycleView(@NonNull ViewHolder holder) {
-        AdapterDelegate<T> delegate = getDelegateForViewType(holder.getItemViewType());
+        BaseAdapterDelegate<T> delegate = getDelegateForViewType(holder.getItemViewType());
         if (delegate == null) {
             throw new NullPointerException("No delegate found for "
                     + holder
@@ -82,7 +82,7 @@ public abstract class AbsDelegatesManager<T> {
     }
 
     public void onViewAttachedToWindow(@NonNull ViewHolder holder) {
-        AdapterDelegate<T> delegate = getDelegateForViewType(holder.getItemViewType());
+        BaseAdapterDelegate<T> delegate = getDelegateForViewType(holder.getItemViewType());
         if (delegate == null) {
             throw new NullPointerException("No delegate found for "
                     + holder
@@ -95,7 +95,7 @@ public abstract class AbsDelegatesManager<T> {
     }
 
     public void onViewDetachedFromWindow(@NonNull ViewHolder holder) {
-        AdapterDelegate<T> delegate = getDelegateForViewType(holder.getItemViewType());
+        BaseAdapterDelegate<T> delegate = getDelegateForViewType(holder.getItemViewType());
         if (delegate == null) {
             throw new NullPointerException("No delegate found for "
                     + holder
@@ -107,13 +107,13 @@ public abstract class AbsDelegatesManager<T> {
         delegate.onViewDetachedFromWindow(holder);
     }
 
-    public AbsDelegatesManager<T> setFallbackDelegate(@Nullable AdapterDelegate<T> fallbackDelegate) {
+    public BaseDelegatesManager<T> setFallbackDelegate(@Nullable BaseAdapterDelegate<T> fallbackDelegate) {
         this.fallbackDelegate = fallbackDelegate;
         return this;
     }
 
     @Nullable
-    public AdapterDelegate<T> getFallbackDelegate() {
+    public BaseAdapterDelegate<T> getFallbackDelegate() {
         return fallbackDelegate;
     }
 

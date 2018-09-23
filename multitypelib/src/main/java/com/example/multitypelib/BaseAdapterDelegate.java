@@ -7,13 +7,13 @@ import android.view.ViewGroup;
 
 import java.util.List;
 
-public abstract class AdapterDelegate<T> {
+public abstract class BaseAdapterDelegate<T> {
 
-    private AbsDelegationAdapter adapter;
+    private BaseDelegationAdapter adapter;
     @LayoutRes
     private int layoutId;
 
-    public AdapterDelegate(AbsDelegationAdapter adapter, int layoutId) {
+    public BaseAdapterDelegate(BaseDelegationAdapter adapter, int layoutId) {
         this.adapter = adapter;
         this.layoutId = layoutId;
     }
@@ -33,7 +33,7 @@ public abstract class AdapterDelegate<T> {
 
     }
 
-    protected abstract void onBindViewHolder(@NonNull T items, int position, @NonNull ViewHolder holder, @NonNull List<Object> payloads);
+    protected abstract void onBindViewHolder(@NonNull List<T> items, int position, @NonNull ViewHolder holder, @NonNull List<Object> payloads);
 
 
     protected void onViewRecycled(@NonNull ViewHolder holder) {
@@ -49,7 +49,7 @@ public abstract class AdapterDelegate<T> {
     protected void onViewDetachedFromWindow(@NonNull ViewHolder holder) {
     }
 
-    public AbsDelegationAdapter getAdapter() {
+    public BaseDelegationAdapter getAdapter() {
         return adapter;
     }
 }
