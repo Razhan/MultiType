@@ -79,7 +79,7 @@ public abstract class BaseDelegationAdapter<T> extends RecyclerView.Adapter<View
         delegatesManager.onViewDetachedFromWindow(holder);
     }
 
-    public void Notify(Event<T> event) {
+    public void notify(Event<T> event) {
         if (event == null) {
             return;
         }
@@ -160,7 +160,7 @@ public abstract class BaseDelegationAdapter<T> extends RecyclerView.Adapter<View
         }
     }
 
-    protected List<T> getItems() {
+    private List<T> getItems() {
         return items;
     }
 

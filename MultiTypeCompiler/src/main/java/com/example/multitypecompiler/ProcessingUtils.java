@@ -10,9 +10,11 @@ import com.squareup.javapoet.ClassName;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import javax.annotation.processing.RoundEnvironment;
 import javax.lang.model.element.Element;
@@ -40,11 +42,8 @@ class ProcessingUtils {
             }
         }
 
-        if (checkDelegateNode(typeInfo)) {
-            return typeInfo;
-        } else {
-            throw new IllegalArgumentException("One Class with specific subtype Can Only correspond to One Delegate");
-        }
+        checkDelegateNode(typeInfo);
+        return typeInfo;
     }
 
     static Map<TypeElement, ExecutableElement> collectTypeMethodInfo(RoundEnvironment env) {
@@ -111,44 +110,27 @@ class ProcessingUtils {
         }
     }
 
-    private static boolean checkDelegateNode(List<TypeNode> nodes) {
+    private static void checkDelegateNode(List<TypeNode> nodes) {
         if (nodes == null || nodes.isEmpty()) {
-            return true;
+            return;
         }
 
-        for (int i = 0; i < nodes.size() - 1; i++) {
-            TypeNode current = nodes.get(i);
-            for (int j = i + 1; j < nodes.size(); j++) {
-                TypeNode other = nodes.get(j);
-                if (!checkNodeInfo(current.supportTypes, other.supportTypes)) {
-                    return false;
+        Set<String> set = new HashSet<>();
+        for (TypeNode node : nodes) {
+            if (node.supportTypes == null || node.supportTypes.isEmpty()) {
+                continue;
+            }
+
+            for (Pair<ClassName, Integer> pair : node.supportTypes) {
+                String typeInfoString = pair.first.toString() + String.valueOf(pair.second);
+                if (set.contains(typeInfoString)) {
+                    throw new IllegalArgumentException(String.format("%s with specific subtype %d Can Only correspond to One Delegate",
+                            pair.first.toString(), pair.second));
                 }
+
+                set.add(typeInfoString);
             }
         }
-
-        return true;
-    }
-
-    private static boolean checkNodeInfo(List<Pair<ClassName, Integer>> infos, List<Pair<ClassName, Integer>> otherInfos) {
-        if (infos == null) {
-            infos = new ArrayList<>();
-        }
-
-        if (otherInfos == null) {
-            otherInfos = new ArrayList<>();
-        }
-
-        for (int i = 0; i < infos.size() - 1; i++) {
-            Pair<ClassName, Integer> current = infos.get(i);
-            for (int j = 0; j < otherInfos.size(); j++) {
-                Pair<ClassName, Integer> other = otherInfos.get(j);
-                if (current.first.toString().equals(other.first.toString()) && current.second.equals(other.second)) {
-                    return false;
-                }
-            }
-        }
-
-        return true;
     }
 
     private static List<Pair<ClassName, Integer>> getSupportTypes(TypeElement element, Elements elementUtils, Delegate type) {

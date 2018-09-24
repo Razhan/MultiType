@@ -37,6 +37,7 @@ import javax.lang.model.SourceVersion;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.Modifier;
 import javax.lang.model.element.TypeElement;
+import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.Elements;
 import javax.tools.Diagnostic;
@@ -46,6 +47,7 @@ import static com.example.multitypecompiler.ProcessingUtils.collectDelegateInfo;
 import static com.example.multitypecompiler.ProcessingUtils.collectDelegateLayoutInfo;
 import static com.example.multitypecompiler.ProcessingUtils.collectTypeMethodInfo;
 import static com.example.multitypecompiler.ProcessingUtils.getTypeArguments;
+import static javax.lang.model.element.Modifier.PUBLIC;
 import static javax.tools.Diagnostic.Kind.ERROR;
 
 @AutoService(Processor.class)
@@ -77,6 +79,14 @@ public class MultipleTypeProcessor extends AbstractProcessor {
         filer = processingEnv.getFiler();
         messager = processingEnv.getMessager();
         elementUtil = processingEnv.getElementUtils();
+
+        String packageString = processingEnv.getOptions().get(OPTION_MULTIPLE_TYPE_INDEX);
+        if (packageString == null || packageString.equals("")) {
+            messager.printMessage(Diagnostic.Kind.ERROR, "No option " + OPTION_MULTIPLE_TYPE_INDEX +
+                    " passed to annotation processor");
+        }
+
+        initClassData(packageString);
     }
 
     private void initClassData(String packageString) {
@@ -108,14 +118,9 @@ public class MultipleTypeProcessor extends AbstractProcessor {
         }
 
         try {
-            String packageString = processingEnv.getOptions().get(OPTION_MULTIPLE_TYPE_INDEX);
-            if (packageString == null) {
-                messager.printMessage(Diagnostic.Kind.ERROR, "No option " + OPTION_MULTIPLE_TYPE_INDEX +
-                        " passed to annotation processor");
+            if (packageName == null || packageName.equals("")) {
                 return false;
             }
-
-            initClassData(packageString);
 
             List<TypeNode> typeInfo = collectDelegateInfo(env, elementUtil);
             Map<TypeElement, ExecutableElement> typeMethods = collectTypeMethodInfo(env);
@@ -160,7 +165,7 @@ public class MultipleTypeProcessor extends AbstractProcessor {
                 ParameterizedTypeName.get(mapNameClass, ClassName.get(Integer.class), ClassName.get(Integer.class)));
 
         return TypeSpec.classBuilder(delegateIndexNameClass)
-                .addModifiers(Modifier.PUBLIC)
+                .addModifiers(PUBLIC)
                 .addField(adapterNameClass, "adapter", Modifier.PRIVATE)
                 .addField(delegateIndexNameClass, "instance", Modifier.PRIVATE, Modifier.STATIC, Modifier.VOLATILE)
                 .addField(delegateInfo, "delegateInfoList", Modifier.PRIVATE)
@@ -177,14 +182,14 @@ public class MultipleTypeProcessor extends AbstractProcessor {
 
     private TypeSpec.Builder generateDelegateInfoClass() {
         return TypeSpec.classBuilder(delegateInfoNameClass)
-                .addModifiers(Modifier.PUBLIC)
-                .addField(int.class, "index", Modifier.PUBLIC)
-                .addField(int.class, "subType", Modifier.PUBLIC)
+                .addModifiers(PUBLIC)
+                .addField(int.class, "index", PUBLIC)
+                .addField(int.class, "subType", PUBLIC)
                 .addField(Class.class, "typeClass")
                 .addField(delegateNameClass, "delegate")
                 .addAnnotation(Keep.class)
                 .addMethod(MethodSpec.constructorBuilder()
-                        .addModifiers(Modifier.PUBLIC)
+                        .addModifiers(PUBLIC)
                         .addParameter(int.class, "index")
                         .addParameter(adapterNameClass, "adapter")
                         .addParameter(Class.class, "clazz")
@@ -230,16 +235,16 @@ public class MultipleTypeProcessor extends AbstractProcessor {
 
             TypeSpec.Builder classBuilder = TypeSpec.classBuilder(managerClassName)
                     .superclass(ParameterizedTypeName.get(managerNameClass, typeClassName))
-                    .addModifiers(Modifier.PUBLIC)
+                    .addModifiers(PUBLIC)
                     .addMethod(MethodSpec.methodBuilder("setAdapter")
-                            .addModifiers(Modifier.PUBLIC)
+                            .addModifiers(PUBLIC)
                             .returns(void.class)
                             .addAnnotation(Override.class)
                             .addParameter(adapterNameClass, "adapter")
                             .addStatement("$T.getInstance().setAdapter($N)", delegateIndexNameClass, "adapter")
                             .build())
                     .addMethod(MethodSpec.methodBuilder("getItemViewType")
-                            .addModifiers(Modifier.PUBLIC)
+                            .addModifiers(PUBLIC)
                             .returns(int.class)
                             .addAnnotation(Override.class)
                             .addParameter(ParameterSpec.builder(itemListType, "items")
@@ -249,7 +254,7 @@ public class MultipleTypeProcessor extends AbstractProcessor {
                             .addStatement("return $T.getInstance().getItemViewType($N.get($N))", delegateIndexNameClass, "items", "position")
                             .build())
                     .addMethod(MethodSpec.methodBuilder("getDelegateForViewType")
-                            .addModifiers(Modifier.PUBLIC)
+                            .addModifiers(PUBLIC)
                             .returns(ParameterizedTypeName.get(delegateNameClass, typeClassName))
                             .addAnnotation(Override.class)
                             .addAnnotation(NonNull)
@@ -269,7 +274,7 @@ public class MultipleTypeProcessor extends AbstractProcessor {
     private MethodSpec.Builder setAdapterMethod() {
         return MethodSpec
                 .methodBuilder("setAdapter")
-                .addModifiers(Modifier.PUBLIC)
+                .addModifiers(PUBLIC)
                 .addParameter(adapterNameClass, "adapter")
                 .addStatement("this.$N = $N", "adapter", "adapter")
                 .returns(void.class);
@@ -278,7 +283,7 @@ public class MultipleTypeProcessor extends AbstractProcessor {
     private MethodSpec.Builder singletonMethod() {
         return MethodSpec
                 .methodBuilder("getInstance")
-                .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
+                .addModifiers(PUBLIC, Modifier.STATIC)
                 .returns(delegateIndexNameClass)
                 .beginControlFlow("if ($N == $S)", "instance", null)
                 .beginControlFlow("synchronized ($T.class)", delegateIndexNameClass)
@@ -363,7 +368,7 @@ public class MultipleTypeProcessor extends AbstractProcessor {
     private MethodSpec.Builder getDelegateMethod() {
         return MethodSpec
                 .methodBuilder("getDelegateByViewType")
-                .addModifiers(Modifier.PUBLIC)
+                .addModifiers(PUBLIC)
                 .addParameter(int.class, "viewType")
                 .returns(delegateNameClass)
                 .beginControlFlow("if ($N == $S || $N.isEmpty())", "delegateInfoList", null, "delegateInfoList")
@@ -397,11 +402,15 @@ public class MultipleTypeProcessor extends AbstractProcessor {
             String methodVariable = "method" + String.valueOf(i);
 
             if (!entry.getValue().getReturnType().toString().equals(int.class.getName())) {
-                throw new IllegalArgumentException("Method with TypeMethod.class Annotation should Only return int type");
+                messager.printMessage(Diagnostic.Kind.ERROR, "Method with TypeMethod.class Annotation should Only return int type");
             }
 
             if (entry.getValue().getParameters() != null && entry.getValue().getParameters().size() > 0) {
-                throw new IllegalArgumentException("Method with TypeMethod.class Annotation should has No Parameter");
+                messager.printMessage(Diagnostic.Kind.ERROR, "Method with TypeMethod.class Annotation should has No Parameter");
+            }
+
+            if (!entry.getValue().getModifiers().contains(PUBLIC)) {
+                messager.printMessage(Diagnostic.Kind.ERROR, "Method with TypeMethod.class Annotation should be Public");
             }
 
             setTypeMethodInfoBuilder.addStatement("$T $N = $T.class.getDeclaredMethod($S)", Method.class, methodVariable, ClassName.get(entry.getKey()), methodName)
@@ -421,7 +430,7 @@ public class MultipleTypeProcessor extends AbstractProcessor {
 
         return MethodSpec
                 .methodBuilder("getItemViewType")
-                .addModifiers(Modifier.PUBLIC)
+                .addModifiers(PUBLIC)
                 .addParameter(Object.class, "item")
                 .returns(int.class)
                 .beginControlFlow("if ($N == null || $N.isEmpty())", "typeInfo", "typeInfo")

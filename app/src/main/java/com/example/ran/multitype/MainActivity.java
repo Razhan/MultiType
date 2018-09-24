@@ -5,6 +5,7 @@ import android.os.Bundle;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 
+import com.example.multitypelib.event.Event;
 import com.example.ran.multitype.model.Animal;
 import com.example.ran.multitype.model.Cat;
 import com.example.ran.multitype.model.Dog;
@@ -12,6 +13,8 @@ import com.example.ran.multitype.adapter.ListAdapter;
 
 import java.util.ArrayList;
 import java.util.List;
+
+import static com.example.multitypelib.event.Type.TYPE_ITEM_RANGE_INSERTED;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -41,6 +44,9 @@ public class MainActivity extends AppCompatActivity {
         animals.add(new Dog("Collie"));
 
         adapter.setItems(animals);
-        adapter.notifyDataSetChanged();
+        adapter.notify(new Event.Builder<Animal>()
+                .type(TYPE_ITEM_RANGE_INSERTED)
+                .dataList(animals)
+                .build());
     }
 }

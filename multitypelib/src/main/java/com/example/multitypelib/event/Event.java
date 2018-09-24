@@ -31,37 +31,37 @@ public final class Event<T> {
       public Builder() {
       }
 
-      public Builder position(int val) {
+      public Builder<V> position(int val) {
          position = val;
          return this;
       }
 
-      public Builder newPosition(int val) {
+      public Builder<V> newPosition(int val) {
          newPosition = val;
          return this;
       }
 
-      public Builder type(@Type int val) {
+      public Builder<V> type(@Type int val) {
          type = val;
          return this;
       }
 
-      public Builder dataList(List<V> val) {
+      public Builder<V> dataList(List<V> val) {
          dataList = val;
          return this;
       }
 
-      public Builder data(V val) {
+      public Builder<V> data(V val) {
          data = val;
          return this;
       }
 
-      public Builder payload(Object val) {
+      public Builder<V> payload(Object val) {
          payload = val;
          return this;
       }
 
-      public Event build() {
+      public Event<V> build() {
          return new Event<>(this);
       }
    }
